@@ -1,0 +1,43 @@
+name: Deploy-Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  production-deploy:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/') || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Node.js and yarn
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build React app
+        run: yarn build
+
+      - name: Deploy to S3 with Serverless Framework
+        run: yarn sls deploy --stage release --verbose
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  skip-deploy:
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'refs/heads/release/') && github.ref != 'refs/heads/main' "
+    steps:
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+        id: extract_branch_name
+
+      - name: Skip deployment Process
+        run: echo 'Deployment process skipped Because You are trying to deploy from' ${{ steps.extract_branch_name.outputs.branch }} 'Branch. Choose the latest release.'
